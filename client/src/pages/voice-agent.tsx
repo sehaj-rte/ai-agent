@@ -74,10 +74,11 @@ export default function VoiceAgent() {
       console.log("Received message:", message);
       // Handle different message types from ElevenLabs
       if (message.source === "user" || message.source === "ai") {
+        const messageContent = (message as any)?.message || String(message) || '';
         const newMessage: Message = {
           id: crypto.randomUUID(),
           conversationId: currentConversationId || "",
-          content: typeof message === 'string' ? message : (message as any).message || '',
+          content: typeof messageContent === 'string' ? messageContent : String(messageContent),
           sender: message.source === "user" ? "user" : "agent",
           timestamp: new Date(),
         };
@@ -145,14 +146,11 @@ export default function VoiceAgent() {
   // Create new conversation
   const createConversationMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("/api/conversations", {
-        method: "POST",
-        body: {
-          agentId,
-          status: "disconnected",
-        },
-      }) as any;
-      return response;
+      const response = await apiRequest("POST", "/api/conversations", {
+        agentId,
+        status: "disconnected",
+      });
+      return await response.json();
     },
     onSuccess: (data: any) => {
       setCurrentConversationId(data.id);
@@ -167,10 +165,8 @@ export default function VoiceAgent() {
   // Create new message
   const createMessageMutation = useMutation({
     mutationFn: async (message: Message) => {
-      return await apiRequest("/api/messages", {
-        method: "POST",
-        body: message,
-      }) as any;
+      const response = await apiRequest("POST", "/api/messages", message);
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 
@@ -182,10 +178,8 @@ export default function VoiceAgent() {
   // Update conversation status
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      return await apiRequest(`/api/conversations/${id}/status`, {
-        method: "PATCH",
-        body: { status },
-      }) as any;
+      const response = await apiRequest("PATCH", `/api/conversations/${id}/status`, { status });
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
