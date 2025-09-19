@@ -37,6 +37,11 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    https: {
+      // Use self-signed certificates for development
+      // This enables HTTPS required for MediaDevices API
+    },
+    host: true, // Allow external connections
     fs: {
       strict: true,
       deny: ["**/.*"],

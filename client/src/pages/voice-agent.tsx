@@ -102,7 +102,7 @@ export default function VoiceAgent() {
     },
     onError: (error) => {
       console.error("Conversation error:", error);
-      const errorMessage = typeof error === "string" ? error : (error && typeof error === 'object' && 'message' in error) ? String(error.message) : "Unknown connection error";
+      const errorMessage = typeof error === "string" ? error : (error && typeof error === 'object' && 'message' in error) ? String((error as any).message) : "Unknown connection error";
       toast({
         title: "Connection Error",
         description: errorMessage,
@@ -201,13 +201,20 @@ export default function VoiceAgent() {
   // Request microphone permission
   const requestMicrophonePermission = useCallback(async () => {
     try {
+      // Check if mediaDevices is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("MediaDevices API not supported. Please use HTTPS or localhost.");
+      }
+      
       await navigator.mediaDevices.getUserMedia({ audio: true });
       return true;
     } catch (error) {
       console.error("Microphone permission denied:", error);
       toast({
         title: "Microphone Access Required",
-        description: "Please allow microphone access to use voice features",
+        description: error instanceof Error && error.message.includes("MediaDevices API") 
+          ? "This feature requires HTTPS. Please access the site via HTTPS or localhost."
+          : "Please allow microphone access to use voice features",
         variant: "destructive",
       });
       return false;
