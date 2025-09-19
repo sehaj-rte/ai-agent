@@ -30,7 +30,7 @@ export default function VoiceAgent() {
   // Update call duration timer
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (callStartTime && conversation.status === "connected") {
+    if (callStartTime) {
       interval = setInterval(() => {
         const duration = Date.now() - callStartTime.getTime();
         const minutes = Math.floor(duration / 60000);
@@ -39,7 +39,8 @@ export default function VoiceAgent() {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [callStartTime, conversation.status]);
+  }, [callStartTime]);
+
 
   // Initialize conversation with ElevenLabs
   const conversation = useConversation({
@@ -76,7 +77,7 @@ export default function VoiceAgent() {
         const newMessage: Message = {
           id: crypto.randomUUID(),
           conversationId: currentConversationId || "",
-          content: message.message,
+          content: typeof message === 'string' ? message : (message as any).message || '',
           sender: message.source === "user" ? "user" : "agent",
           timestamp: new Date(),
         };
@@ -133,7 +134,7 @@ export default function VoiceAgent() {
 
   // Update messages when fetched from backend
   useEffect(() => {
-    if (conversationMessages) {
+    if (conversationMessages && Array.isArray(conversationMessages)) {
       setMessages(conversationMessages.map((msg: any) => ({
         ...msg,
         timestamp: new Date(msg.timestamp),
@@ -148,12 +149,12 @@ export default function VoiceAgent() {
         method: "POST",
         body: {
           agentId,
-          status: conversation.status || "disconnected",
+          status: "disconnected",
         },
-      });
+      }) as any;
       return response;
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       setCurrentConversationId(data.id);
       console.log("Conversation started:", data.id);
       queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
@@ -169,7 +170,7 @@ export default function VoiceAgent() {
       return await apiRequest("/api/messages", {
         method: "POST",
         body: message,
-      });
+      }) as any;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 
@@ -184,7 +185,7 @@ export default function VoiceAgent() {
       return await apiRequest(`/api/conversations/${id}/status`, {
         method: "PATCH",
         body: { status },
-      });
+      }) as any;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
