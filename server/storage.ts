@@ -1,5 +1,7 @@
 import { type User, type InsertUser, type Conversation, type InsertConversation, type Message, type InsertMessage } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { users, conversations, messages } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -15,88 +17,77 @@ export interface IStorage {
   createMessage(message: InsertMessage): Promise<Message>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private conversations: Map<string, Conversation>;
-  private messages: Map<string, Message>;
-
-  constructor() {
-    this.users = new Map();
-    this.conversations = new Map();
-    this.messages = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
     return user;
   }
 
   async getConversation(id: string): Promise<Conversation | undefined> {
-    return this.conversations.get(id);
+    const [conversation] = await db.select().from(conversations).where(eq(conversations.id, id));
+    return conversation || undefined;
   }
 
   async createConversation(insertConversation: InsertConversation): Promise<Conversation> {
-    const id = randomUUID();
-    const conversation: Conversation = {
-      id,
-      userId: null,
-      agentId: insertConversation.agentId,
-      connectionType: insertConversation.connectionType || "webrtc",
-      status: "disconnected",
-      startedAt: new Date(),
-      endedAt: null,
-    };
-    this.conversations.set(id, conversation);
+    const [conversation] = await db
+      .insert(conversations)
+      .values({
+        agentId: insertConversation.agentId,
+        connectionType: insertConversation.connectionType || "webrtc",
+      })
+      .returning();
     return conversation;
   }
 
   async updateConversationStatus(id: string, status: string): Promise<void> {
-    const conversation = this.conversations.get(id);
-    if (conversation) {
-      conversation.status = status;
-      this.conversations.set(id, conversation);
-    }
+    await db
+      .update(conversations)
+      .set({ status })
+      .where(eq(conversations.id, id));
   }
 
   async endConversation(id: string): Promise<void> {
-    const conversation = this.conversations.get(id);
-    if (conversation) {
-      conversation.status = "disconnected";
-      conversation.endedAt = new Date();
-      this.conversations.set(id, conversation);
-    }
+    await db
+      .update(conversations)
+      .set({ 
+        status: "disconnected",
+        endedAt: new Date()
+      })
+      .where(eq(conversations.id, id));
   }
 
   async getMessages(conversationId: string): Promise<Message[]> {
-    return Array.from(this.messages.values()).filter(
-      (message) => message.conversationId === conversationId,
-    );
+    return await db
+      .select()
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(messages.timestamp);
   }
 
   async createMessage(insertMessage: InsertMessage): Promise<Message> {
-    const id = randomUUID();
-    const message: Message = {
-      id,
-      conversationId: insertMessage.conversationId || null,
-      content: insertMessage.content,
-      sender: insertMessage.sender,
-      timestamp: new Date(),
-    };
-    this.messages.set(id, message);
+    const [message] = await db
+      .insert(messages)
+      .values({
+        conversationId: insertMessage.conversationId,
+        content: insertMessage.content,
+        sender: insertMessage.sender,
+      })
+      .returning();
     return message;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
