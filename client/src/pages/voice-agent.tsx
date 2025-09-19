@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { formatDistanceToNow } from "date-fns";
 
@@ -406,15 +407,24 @@ export default function VoiceAgent() {
                   <User className="w-12 h-12" />
                 </AvatarFallback>
               </Avatar>
-              {/* Audio visualization ring */}
-              {conversation.status === "connected" && (
-                <div 
-                  className="absolute inset-0 rounded-full border-4 border-orange-500 animate-pulse"
-                  style={{
-                    opacity: Math.max(0.3, outputVolume),
-                    transform: `scale(${1 + outputVolume * 0.1})`
-                  }}
-                />
+              {/* Buffering/Activity ring */}
+              {(conversation.status === "connecting" || conversation.status === "connected") && (
+                <div className="absolute inset-0">
+                  {conversation.status === "connecting" ? (
+                    // Spinning buffer ring during connection
+                    <div className="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-transparent border-b-blue-500 border-l-transparent animate-spin"></div>
+                  ) : (
+                    // Audio visualization ring when connected
+                    <div 
+                      className="absolute inset-0 rounded-full border-4 border-green-500 transition-all duration-300"
+                      style={{
+                        opacity: Math.max(0.4, outputVolume),
+                        transform: `scale(${1 + outputVolume * 0.15})`,
+                        borderWidth: `${2 + outputVolume * 6}px`
+                      }}
+                    />
+                  )}
+                </div>
               )}
             </div>
             
