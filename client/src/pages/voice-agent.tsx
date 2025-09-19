@@ -407,23 +407,25 @@ export default function VoiceAgent() {
                   <User className="w-12 h-12" />
                 </AvatarFallback>
               </Avatar>
-              {/* Buffering/Activity ring */}
-              {(conversation.status === "connecting" || conversation.status === "connected") && (
-                <div className="absolute inset-0">
-                  {conversation.status === "connecting" ? (
-                    // Spinning buffer ring during connection
-                    <div className="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-transparent border-b-blue-500 border-l-transparent animate-spin"></div>
-                  ) : (
-                    // Audio visualization ring when connected
-                    <div 
-                      className="absolute inset-0 rounded-full border-4 border-green-500 transition-all duration-300"
-                      style={{
-                        opacity: Math.max(0.4, outputVolume),
-                        transform: `scale(${1 + outputVolume * 0.15})`,
-                        borderWidth: `${2 + outputVolume * 6}px`
-                      }}
-                    />
-                  )}
+              {/* Phone call style animation rings */}
+              {conversation.status === "connecting" && (
+                <div className="absolute inset-0 pointer-events-none">
+                  {/* Continuous rotating ring during connection */}
+                  <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-blue-500 animate-spin"></div>
+                  <div className="absolute inset-1 rounded-full border-2 border-transparent border-t-orange-400 animate-spin" style={{ animationDuration: '1.5s', animationDirection: 'reverse' }}></div>
+                </div>
+              )}
+              
+              {conversation.status === "connected" && outputVolume > 0.1 && (
+                <div className="absolute inset-0 pointer-events-none">
+                  {/* Subtle pulse ring when agent speaks */}
+                  <div 
+                    className="absolute inset-0 rounded-full border-2 border-green-400 animate-pulse"
+                    style={{
+                      opacity: Math.max(0.6, outputVolume),
+                      transform: `scale(${1 + outputVolume * 0.1})`
+                    }}
+                  />
                 </div>
               )}
             </div>
@@ -472,13 +474,6 @@ export default function VoiceAgent() {
           </div>
 
           {/* Status Messages */}
-          {conversation.status === "connecting" && (
-            <div className="text-center py-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-2"></div>
-              <p className="text-sm text-gray-600 dark:text-gray-300">Connecting...</p>
-            </div>
-          )}
-
           {conversation.status === "connected" && (
             <div className="text-center py-4">
               <p className="text-sm text-gray-600 dark:text-gray-300">
