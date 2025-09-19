@@ -314,10 +314,7 @@ export default function VoiceAgent() {
         <CardContent className="p-8 text-center">
           {/* Header with status */}
           <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span className="text-sm text-gray-600 dark:text-gray-300">ElevenLabs</span>
-            </div>
+            <div></div>
             <div className="flex items-center space-x-3">
               {conversation.status === "connected" && (
                 <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
@@ -325,15 +322,75 @@ export default function VoiceAgent() {
                   <span data-testid="call-duration">{callDuration}</span>
                 </div>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowSettings(!showSettings)}
-                className="p-2 h-8 w-8"
-                data-testid="button-settings"
-              >
-                <Settings className="w-4 h-4" />
-              </Button>
+              <div className="relative">
+                <DropdownMenu open={showSettings} onOpenChange={setShowSettings}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="p-2 h-8 w-8"
+                      data-testid="button-settings"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-80 p-4">
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-sm font-medium text-foreground mb-3 block">
+                          Connection Type
+                        </Label>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild disabled={conversation.status !== "disconnected"}>
+                            <Button 
+                              variant="outline" 
+                              className="w-full justify-between h-auto p-3"
+                              data-testid="connection-type-select"
+                            >
+                              <div className="text-left">
+                                <div className="font-medium">
+                                  {connectionType === "webrtc" ? "WebRTC (Recommended)" : "WebSocket"}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 font-normal">
+                                  {connectionType === "webrtc" 
+                                    ? "Lower latency, better audio quality" 
+                                    : "Alternative connection method"
+                                  }
+                                </div>
+                              </div>
+                              <ChevronDown className="h-4 w-4 opacity-50" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-80" align="start">
+                            <DropdownMenuItem 
+                              onClick={() => setConnectionType("webrtc")}
+                              className="p-3 cursor-pointer"
+                            >
+                              <div className="flex flex-col space-y-1">
+                                <div className="font-medium">WebRTC (Recommended)</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  Lower latency, better audio quality
+                                </div>
+                              </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => setConnectionType("websocket")}
+                              className="p-3 cursor-pointer"
+                            >
+                              <div className="flex flex-col space-y-1">
+                                <div className="font-medium">WebSocket</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  Alternative connection method
+                                </div>
+                              </div>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
 
@@ -365,73 +422,12 @@ export default function VoiceAgent() {
               Dr. Elisa Song - Trial
             </h1>
             
-            <div className={`text-sm font-medium mb-4 ${getStatusColor(conversation.status)}`}>
-              <span data-testid="connection-status">{getStatusText(conversation.status)}</span>
-            </div>
 
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 max-w-sm mx-auto">
               Integrative Pediatrician, Founder of Healthy Kids Happy Kids
             </p>
           </div>
 
-          {/* Settings Panel */}
-          {showSettings && (
-            <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border">
-              <div className="space-y-4">
-                <div className="text-left">
-                  <Label className="text-sm font-medium text-foreground mb-3 block">
-                    Connection Type
-                  </Label>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild disabled={conversation.status !== "disconnected"}>
-                      <Button 
-                        variant="outline" 
-                        className="w-full justify-between h-auto p-3"
-                        data-testid="connection-type-select"
-                      >
-                        <div className="text-left">
-                          <div className="font-medium">
-                            {connectionType === "webrtc" ? "WebRTC (Recommended)" : "WebSocket"}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 font-normal">
-                            {connectionType === "webrtc" 
-                              ? "Lower latency, better audio quality" 
-                              : "Alternative connection method"
-                            }
-                          </div>
-                        </div>
-                        <ChevronDown className="h-4 w-4 opacity-50" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-80" align="start">
-                      <DropdownMenuItem 
-                        onClick={() => setConnectionType("webrtc")}
-                        className="p-3 cursor-pointer"
-                      >
-                        <div className="flex flex-col space-y-1">
-                          <div className="font-medium">WebRTC (Recommended)</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Lower latency, better audio quality
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => setConnectionType("websocket")}
-                        className="p-3 cursor-pointer"
-                      >
-                        <div className="flex flex-col space-y-1">
-                          <div className="font-medium">WebSocket</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Alternative connection method
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Call Controls */}
           <div className="flex items-center justify-center space-x-8 mb-8">
