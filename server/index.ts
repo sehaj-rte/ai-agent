@@ -37,6 +37,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Add ELEVENLABS_AGENT_ID to Vite env variables
+  process.env.VITE_ELEVENLABS_AGENT_ID = process.env.ELEVENLABS_AGENT_ID;
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

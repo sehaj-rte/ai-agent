@@ -1,21 +1,22 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useConversation } from "@elevenlabs/react";
-import { Mic, Shield, AlertCircle, CheckCircle } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, User, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Message } from "@shared/schema";
-import ConversationArea from "@/components/voice-agent/conversation-area";
-import ControlsPanel from "@/components/voice-agent/controls-panel";
-import FeedbackSection from "@/components/voice-agent/feedback-section";
-import AgentSetup from "@/components/voice-agent/agent-setup";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Card, CardContent } from "@/components/ui/card";
+import { formatDistanceToNow } from "date-fns";
 
 export default function VoiceAgent() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
   // Configuration state
-  const [agentId, setAgentId] = useState(import.meta.env.VITE_ELEVENLABS_AGENT_ID || "");
+  // Get agent ID from environment variable
+  const agentId = import.meta.env.VITE_ELEVENLABS_AGENT_ID || "agent_9901k5e65rsjebg8k5f2k3sqyqv6";
   const [volume, setVolume] = useState(80);
   const [micMuted, setMicMuted] = useState(false);
   const [connectionType, setConnectionType] = useState<"webrtc" | "websocket">("webrtc");
@@ -23,6 +24,22 @@ export default function VoiceAgent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputVolume, setInputVolume] = useState(0);
   const [outputVolume, setOutputVolume] = useState(0);
+  const [callStartTime, setCallStartTime] = useState<Date | null>(null);
+  const [callDuration, setCallDuration] = useState<string>("00:00");
+
+  // Update call duration timer
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (callStartTime && conversation.status === "connected") {
+      interval = setInterval(() => {
+        const duration = Date.now() - callStartTime.getTime();
+        const minutes = Math.floor(duration / 60000);
+        const seconds = Math.floor((duration % 60000) / 1000);
+        setCallDuration(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [callStartTime, conversation.status]);
 
   // Initialize conversation with ElevenLabs
   const conversation = useConversation({
@@ -30,6 +47,7 @@ export default function VoiceAgent() {
     micMuted,
     onConnect: () => {
       console.log("Conversation connected successfully");
+      setCallStartTime(new Date());
       toast({
         title: "Connected",
         description: "Successfully connected to voice agent",
@@ -37,6 +55,8 @@ export default function VoiceAgent() {
     },
     onDisconnect: () => {
       console.log("Conversation disconnected");
+      setCallStartTime(null);
+      setCallDuration("00:00");
       toast({
         title: "Disconnected",
         description: "Voice agent conversation ended",
@@ -111,27 +131,45 @@ export default function VoiceAgent() {
     enabled: !!currentConversationId,
   });
 
-  // Create conversation mutation
+  // Update messages when fetched from backend
+  useEffect(() => {
+    if (conversationMessages) {
+      setMessages(conversationMessages.map((msg: any) => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp),
+      })));
+    }
+  }, [conversationMessages]);
+
+  // Create new conversation
   const createConversationMutation = useMutation({
-    mutationFn: async (data: { agentId: string; connectionType: string }) => {
-      const response = await apiRequest("POST", "/api/conversations", data);
-      return response.json();
+    mutationFn: async () => {
+      const response = await apiRequest("/api/conversations", {
+        method: "POST",
+        body: {
+          agentId,
+          status: conversation.status || "disconnected",
+        },
+      });
+      return response;
     },
     onSuccess: (data) => {
       setCurrentConversationId(data.id);
+      console.log("Conversation started:", data.id);
       queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+    },
+    onError: (error) => {
+      console.error("Failed to create conversation:", error);
     },
   });
 
-  // Create message mutation
+  // Create new message
   const createMessageMutation = useMutation({
     mutationFn: async (message: Message) => {
-      const response = await apiRequest("POST", "/api/messages", {
-        conversationId: message.conversationId,
-        content: message.content,
-        sender: message.sender,
+      return await apiRequest("/api/messages", {
+        method: "POST",
+        body: message,
       });
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 
@@ -140,11 +178,16 @@ export default function VoiceAgent() {
     },
   });
 
-  // Update conversation status mutation
+  // Update conversation status
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const response = await apiRequest("PATCH", `/api/conversations/${id}/status`, { status });
-      return response.json();
+      return await apiRequest(`/api/conversations/${id}/status`, {
+        method: "PATCH",
+        body: { status },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
     },
   });
 
@@ -205,35 +248,16 @@ export default function VoiceAgent() {
   // Start conversation session
   const handleStartSession = useCallback(async () => {
     try {
-      // Request microphone permission
+      // Request microphone permission first
       const hasPermission = await requestMicrophonePermission();
       if (!hasPermission) return;
 
-      // Create conversation record
-      await createConversationMutation.mutateAsync({
-        agentId,
-        connectionType,
-      });
+      // Create new conversation record
+      await createConversationMutation.mutateAsync();
 
-      // Get authentication
+      // Get authentication and start conversation
       const auth = await getConversationAuth();
-      
-      // Start ElevenLabs conversation
-      const conversationId = await conversation.startSession({
-        agentId,
-        connectionType,
-        ...auth,
-      });
-
-      // Update conversation status
-      if (currentConversationId) {
-        await updateStatusMutation.mutateAsync({
-          id: currentConversationId,
-          status: "connected",
-        });
-      }
-
-      console.log("Conversation started:", conversationId);
+      await conversation.startSession(auth);
     } catch (error) {
       console.error("Failed to start conversation:", error);
       toast({
@@ -242,206 +266,164 @@ export default function VoiceAgent() {
         variant: "destructive",
       });
     }
-  }, [
-    agentId,
-    connectionType,
-    conversation,
-    currentConversationId,
-    createConversationMutation,
-    getConversationAuth,
-    requestMicrophonePermission,
-    toast,
-    updateStatusMutation,
-  ]);
+  }, [conversation, createConversationMutation, getConversationAuth, requestMicrophonePermission, toast]);
 
   // End conversation session
-  const handleEndSession = useCallback(async () => {
+  const handleEndSession = useCallback(() => {
     try {
-      await conversation.endSession();
-      
-      if (currentConversationId) {
-        await updateStatusMutation.mutateAsync({
-          id: currentConversationId,
-          status: "disconnected",
-        });
-      }
+      conversation.endSession();
+      setMessages([]);
+      setCurrentConversationId(null);
     } catch (error) {
       console.error("Failed to end conversation:", error);
-      toast({
-        title: "Error",
-        description: "Failed to end conversation properly",
-        variant: "destructive",
-      });
-    }
-  }, [conversation, currentConversationId, toast, updateStatusMutation]);
-
-  // Handle volume change
-  const handleVolumeChange = useCallback(async (newVolume: number) => {
-    setVolume(newVolume);
-    await conversation.setVolume({ volume: newVolume / 100 });
-  }, [conversation]);
-
-  // Toggle microphone
-  const handleToggleMic = useCallback(() => {
-    setMicMuted(!micMuted);
-  }, [micMuted]);
-
-  // Send text message
-  const handleSendMessage = useCallback((message: string) => {
-    conversation.sendUserMessage(message);
-  }, [conversation]);
-
-  // Send user activity
-  const handleUserActivity = useCallback(() => {
-    conversation.sendUserActivity();
-  }, [conversation]);
-
-  // Send feedback
-  const handleFeedback = useCallback((positive: boolean) => {
-    conversation.sendFeedback(positive);
-    toast({
-      title: "Feedback Sent",
-      description: `Thank you for your ${positive ? "positive" : "negative"} feedback`,
-    });
-  }, [conversation, toast]);
-
-  // Handle device changes
-  const handleInputDeviceChange = useCallback(async (deviceId: string) => {
-    try {
-      await conversation.changeInputDevice({
-        sampleRate: 16000,
-        format: 'pcm',
-        inputDeviceId: deviceId,
-      });
-    } catch (error) {
-      console.error("Failed to change input device:", error);
     }
   }, [conversation]);
 
-  const handleOutputDeviceChange = useCallback(async (deviceId: string) => {
-    try {
-      await conversation.changeOutputDevice({
-        sampleRate: 16000,
-        format: 'pcm',
-        outputDeviceId: deviceId,
-      });
-    } catch (error) {
-      console.error("Failed to change output device:", error);
-    }
-  }, [conversation]);
+  // Toggle microphone mute
+  const toggleMute = useCallback(() => {
+    setMicMuted(prev => !prev);
+  }, []);
 
-  // Update messages when conversation messages are fetched
-  useEffect(() => {
-    if (Array.isArray(conversationMessages)) {
-      setMessages(conversationMessages);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "connected":
+        return "text-green-500";
+      case "connecting":
+        return "text-yellow-500";
+      case "disconnected":
+        return "text-red-500";
+      default:
+        return "text-gray-500";
     }
-  }, [conversationMessages]);
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "connected":
+        return "Connected";
+      case "connecting":
+        return "Connecting...";
+      case "disconnected":
+        return "Disconnected";
+      default:
+        return "Ready";
+    }
+  };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="bg-card border-b border-border">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <Mic className="w-4 h-4 text-primary-foreground" />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md bg-white dark:bg-gray-800 shadow-2xl">
+        <CardContent className="p-8 text-center">
+          {/* Header with status */}
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="text-sm text-gray-600 dark:text-gray-300">ElevenLabs</span>
+            </div>
+            {conversation.status === "connected" && (
+              <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                <Clock className="w-4 h-4" />
+                <span data-testid="call-duration">{callDuration}</span>
               </div>
-              <div>
-                <h1 className="text-lg font-semibold text-foreground">Voice Agent</h1>
-                <p className="text-sm text-muted-foreground">ElevenLabs Conversation Interface</p>
-              </div>
+            )}
+          </div>
+
+          {/* Agent Profile */}
+          <div className="mb-8">
+            <div className="relative mb-4">
+              <Avatar className="w-32 h-32 mx-auto mb-4 ring-4 ring-white dark:ring-gray-700 shadow-lg">
+                <AvatarImage 
+                  src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=300&h=300&fit=crop&crop=face" 
+                  alt="Dr. Elisa Song"
+                />
+                <AvatarFallback className="text-2xl">
+                  <User className="w-12 h-12" />
+                </AvatarFallback>
+              </Avatar>
+              {/* Audio visualization ring */}
+              {conversation.status === "connected" && (
+                <div 
+                  className="absolute inset-0 rounded-full border-4 border-orange-500 animate-pulse"
+                  style={{
+                    opacity: Math.max(0.3, outputVolume),
+                    transform: `scale(${1 + outputVolume * 0.1})`
+                  }}
+                />
+              )}
             </div>
             
-            {/* Connection Status */}
-            <div className="flex items-center space-x-2">
-              <div className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-accent/10 border border-accent/20">
-                <div 
-                  className={`w-2 h-2 rounded-full ${
-                    conversation.status === "connected" 
-                      ? "bg-accent animate-pulse-slow" 
-                      : "bg-muted-foreground"
-                  }`}
-                  data-testid="connection-indicator"
-                />
-                <span 
-                  className={`text-sm font-medium ${
-                    conversation.status === "connected" ? "text-accent" : "text-muted-foreground"
-                  }`}
-                  data-testid="connection-status"
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              Dr. Elisa Song - Trial
+            </h1>
+            
+            <div className={`text-sm font-medium mb-4 ${getStatusColor(conversation.status)}`}>
+              <span data-testid="connection-status">{getStatusText(conversation.status)}</span>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 max-w-sm mx-auto">
+              Integrative Pediatrician, Founder of Healthy Kids Happy Kids
+            </p>
+          </div>
+
+          {/* Call Controls */}
+          <div className="flex items-center justify-center space-x-8 mb-8">
+            {conversation.status === "disconnected" ? (
+              <Button
+                onClick={handleStartSession}
+                className="w-16 h-16 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg"
+                data-testid="button-start-call"
+              >
+                <Phone className="w-8 h-8" />
+              </Button>
+            ) : (
+              <>
+                <Button
+                  onClick={toggleMute}
+                  variant={micMuted ? "destructive" : "outline"}
+                  className="w-12 h-12 rounded-full"
+                  data-testid="button-toggle-mute"
                 >
-                  {conversation.status === "connected" ? "Connected" : "Disconnected"}
-                </span>
+                  {micMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                </Button>
+                
+                <Button
+                  onClick={handleEndSession}
+                  className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-lg"
+                  data-testid="button-end-call"
+                >
+                  <PhoneOff className="w-8 h-8" />
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* Status Messages */}
+          {conversation.status === "connecting" && (
+            <div className="text-center py-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-2"></div>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Connecting...</p>
+            </div>
+          )}
+
+          {conversation.status === "connected" && (
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Listening...
+              </p>
+            </div>
+          )}
+
+          {/* Recent Messages Preview (optional, small preview) */}
+          {messages.length > 0 && conversation.status === "connected" && (
+            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Recent:</div>
+              <div className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
+                {messages[messages.length - 1]?.content}
               </div>
             </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col">
-        <div className="max-w-4xl mx-auto w-full px-4 py-8 flex-1">
-          
-          {/* Agent Setup */}
-          <AgentSetup 
-            agentId={agentId}
-            onAgentIdChange={setAgentId}
-            isConnected={conversation.status === "connected"}
-          />
-
-          {/* Conversation Area */}
-          <ConversationArea
-            status={conversation.status}
-            isSpeaking={conversation.isSpeaking}
-            messages={messages}
-            inputVolume={inputVolume}
-            outputVolume={outputVolume}
-          />
-
-          {/* Controls Panel */}
-          <ControlsPanel
-            status={conversation.status}
-            volume={volume}
-            micMuted={micMuted}
-            connectionType={connectionType}
-            onStartSession={handleStartSession}
-            onEndSession={handleEndSession}
-            onToggleMic={handleToggleMic}
-            onVolumeChange={handleVolumeChange}
-            onConnectionTypeChange={(type) => setConnectionType(type as "webrtc" | "websocket")}
-            onInputDeviceChange={handleInputDeviceChange}
-            onOutputDeviceChange={handleOutputDeviceChange}
-            onSendMessage={handleSendMessage}
-            onUserActivity={handleUserActivity}
-          />
-
-          {/* Feedback Section */}
-          <FeedbackSection
-            canSendFeedback={conversation.canSendFeedback}
-            onFeedback={handleFeedback}
-          />
-
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-card border-t border-border">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <div className="flex items-center space-x-4">
-              <span>Powered by ElevenLabs</span>
-              <span className="text-border">•</span>
-              <span data-testid="conversation-id">
-                ID: {conversation.getId() || "Not connected"}
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Shield className="w-4 h-4 text-accent" />
-              <span>Secure Connection</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
