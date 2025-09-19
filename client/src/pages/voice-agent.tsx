@@ -379,28 +379,55 @@ export default function VoiceAgent() {
             <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border">
               <div className="space-y-4">
                 <div className="text-left">
-                  <Label className="text-sm font-medium text-foreground mb-2 block">
+                  <Label className="text-sm font-medium text-foreground mb-3 block">
                     Connection Type
                   </Label>
-                  <Select 
-                    value={connectionType} 
-                    onValueChange={(value: "webrtc" | "websocket") => setConnectionType(value)}
-                    disabled={conversation.status !== "disconnected"}
-                  >
-                    <SelectTrigger data-testid="connection-type-select" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="webrtc">WebRTC (Recommended)</SelectItem>
-                      <SelectItem value="websocket">WebSocket</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {connectionType === "webrtc" 
-                      ? "Lower latency, better audio quality" 
-                      : "Alternative connection method"
-                    }
-                  </p>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild disabled={conversation.status !== "disconnected"}>
+                      <Button 
+                        variant="outline" 
+                        className="w-full justify-between h-auto p-3"
+                        data-testid="connection-type-select"
+                      >
+                        <div className="text-left">
+                          <div className="font-medium">
+                            {connectionType === "webrtc" ? "WebRTC (Recommended)" : "WebSocket"}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-normal">
+                            {connectionType === "webrtc" 
+                              ? "Lower latency, better audio quality" 
+                              : "Alternative connection method"
+                            }
+                          </div>
+                        </div>
+                        <ChevronDown className="h-4 w-4 opacity-50" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-80" align="start">
+                      <DropdownMenuItem 
+                        onClick={() => setConnectionType("webrtc")}
+                        className="p-3 cursor-pointer"
+                      >
+                        <div className="flex flex-col space-y-1">
+                          <div className="font-medium">WebRTC (Recommended)</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Lower latency, better audio quality
+                          </div>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setConnectionType("websocket")}
+                        className="p-3 cursor-pointer"
+                      >
+                        <div className="flex flex-col space-y-1">
+                          <div className="font-medium">WebSocket</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Alternative connection method
+                          </div>
+                        </div>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </div>
