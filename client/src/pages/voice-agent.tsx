@@ -419,20 +419,19 @@ export default function VoiceAgent() {
                   <User className="w-12 h-12" />
                 </AvatarFallback>
               </Avatar>
-              {/* Phone call style animation rings */}
+              {/* Professional phone call animations */}
               {conversation.status === "connecting" && (
-                <div className="absolute inset-0 pointer-events-none">
-                  {/* Continuous rotating ring during connection */}
-                  <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-blue-500 animate-spin"></div>
-                  <div className="absolute inset-1 rounded-full border-2 border-transparent border-t-orange-400 animate-spin" style={{ animationDuration: '1.5s', animationDirection: 'reverse' }}></div>
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  {/* Simple rotating ring during connection */}
+                  <div className="w-36 h-36 rounded-full border-2 border-blue-400 border-t-transparent animate-spin"></div>
                 </div>
               )}
               
               {isAgentSpeaking && (
-                <div className="absolute inset-0 pointer-events-none">
-                  {/* Pulsing glow when agent speaks */}
-                  <div className="absolute inset-0 rounded-full border-4 border-green-400 animate-ping"></div>
-                  <div className="absolute inset-2 rounded-full border-2 border-green-300 animate-pulse"></div>
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  {/* Subtle pulse rings when speaking - like WhatsApp/FaceTime */}
+                  <div className="w-36 h-36 rounded-full border-2 border-green-400 opacity-60 animate-pulse"></div>
+                  <div className="absolute w-40 h-40 rounded-full border border-green-300 opacity-40 animate-ping"></div>
                 </div>
               )}
             </div>
