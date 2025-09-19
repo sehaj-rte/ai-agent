@@ -27,6 +27,7 @@ export default function VoiceAgent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputVolume, setInputVolume] = useState(0);
   const [outputVolume, setOutputVolume] = useState(0);
+  const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
   const [callStartTime, setCallStartTime] = useState<Date | null>(null);
   const [callDuration, setCallDuration] = useState<string>("00:00");
   const [showSettings, setShowSettings] = useState(false);
@@ -87,6 +88,13 @@ export default function VoiceAgent() {
           timestamp: new Date(),
         };
         setMessages(prev => [...prev, newMessage]);
+        
+        // Trigger agent speaking animation
+        if (message.source === "ai") {
+          setIsAgentSpeaking(true);
+          // Stop animation after 3 seconds
+          setTimeout(() => setIsAgentSpeaking(false), 3000);
+        }
         
         // Save message to backend
         createMessageMutation.mutate(newMessage);
@@ -398,7 +406,11 @@ export default function VoiceAgent() {
           {/* Agent Profile */}
           <div className="mb-8">
             <div className="relative mb-4">
-              <Avatar className="w-32 h-32 mx-auto mb-4 ring-4 ring-white dark:ring-gray-700 shadow-lg">
+              <Avatar 
+                className={`w-32 h-32 mx-auto mb-4 ring-4 ring-white dark:ring-gray-700 shadow-lg transition-transform duration-200 ${
+                  isAgentSpeaking ? 'scale-110' : 'scale-100'
+                }`}
+              >
                 <AvatarImage 
                   src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=300&h=300&fit=crop&crop=face" 
                   alt="Dr. Elisa Song"
@@ -416,16 +428,11 @@ export default function VoiceAgent() {
                 </div>
               )}
               
-              {conversation.status === "connected" && outputVolume > 0.1 && (
+              {conversation.status === "connected" && isAgentSpeaking && (
                 <div className="absolute inset-0 pointer-events-none">
-                  {/* Subtle pulse ring when agent speaks */}
-                  <div 
-                    className="absolute inset-0 rounded-full border-2 border-green-400 animate-pulse"
-                    style={{
-                      opacity: Math.max(0.6, outputVolume),
-                      transform: `scale(${1 + outputVolume * 0.1})`
-                    }}
-                  />
+                  {/* Pulsing glow when agent speaks */}
+                  <div className="absolute inset-0 rounded-full border-4 border-green-400 animate-ping"></div>
+                  <div className="absolute inset-2 rounded-full border-2 border-green-300 animate-pulse"></div>
                 </div>
               )}
             </div>
