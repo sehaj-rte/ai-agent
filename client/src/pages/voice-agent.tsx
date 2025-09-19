@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useConversation } from "@elevenlabs/react";
-import { Phone, PhoneOff, Mic, MicOff, User, Clock } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, User, Clock, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Message } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { formatDistanceToNow } from "date-fns";
 
 export default function VoiceAgent() {
@@ -26,6 +28,7 @@ export default function VoiceAgent() {
   const [outputVolume, setOutputVolume] = useState(0);
   const [callStartTime, setCallStartTime] = useState<Date | null>(null);
   const [callDuration, setCallDuration] = useState<string>("00:00");
+  const [showSettings, setShowSettings] = useState(false);
 
   // Update call duration timer
   useEffect(() => {
@@ -315,12 +318,23 @@ export default function VoiceAgent() {
               <div className="w-2 h-2 rounded-full bg-green-500"></div>
               <span className="text-sm text-gray-600 dark:text-gray-300">ElevenLabs</span>
             </div>
-            {conversation.status === "connected" && (
-              <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
-                <Clock className="w-4 h-4" />
-                <span data-testid="call-duration">{callDuration}</span>
-              </div>
-            )}
+            <div className="flex items-center space-x-3">
+              {conversation.status === "connected" && (
+                <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                  <Clock className="w-4 h-4" />
+                  <span data-testid="call-duration">{callDuration}</span>
+                </div>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSettings(!showSettings)}
+                className="p-2 h-8 w-8"
+                data-testid="button-settings"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Agent Profile */}
@@ -359,6 +373,38 @@ export default function VoiceAgent() {
               Integrative Pediatrician, Founder of Healthy Kids Happy Kids
             </p>
           </div>
+
+          {/* Settings Panel */}
+          {showSettings && (
+            <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border">
+              <div className="space-y-4">
+                <div className="text-left">
+                  <Label className="text-sm font-medium text-foreground mb-2 block">
+                    Connection Type
+                  </Label>
+                  <Select 
+                    value={connectionType} 
+                    onValueChange={(value: "webrtc" | "websocket") => setConnectionType(value)}
+                    disabled={conversation.status !== "disconnected"}
+                  >
+                    <SelectTrigger data-testid="connection-type-select" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="webrtc">WebRTC (Recommended)</SelectItem>
+                      <SelectItem value="websocket">WebSocket</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {connectionType === "webrtc" 
+                      ? "Lower latency, better audio quality" 
+                      : "Alternative connection method"
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Call Controls */}
           <div className="flex items-center justify-center space-x-8 mb-8">
