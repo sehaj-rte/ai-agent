@@ -29,18 +29,28 @@ export default function VoiceAgent() {
     volume: volume / 100,
     micMuted,
     onConnect: () => {
+      console.log("Conversation connected successfully");
       toast({
         title: "Connected",
         description: "Successfully connected to voice agent",
       });
     },
     onDisconnect: () => {
+      console.log("Conversation disconnected");
       toast({
         title: "Disconnected",
         description: "Voice agent conversation ended",
       });
+      // Update conversation status in backend
+      if (currentConversationId) {
+        updateStatusMutation.mutate({
+          id: currentConversationId,
+          status: "disconnected",
+        });
+      }
     },
     onMessage: (message) => {
+      console.log("Received message:", message);
       // Handle different message types from ElevenLabs
       if (message.source === "user" || message.source === "ai") {
         const newMessage: Message = {
@@ -58,11 +68,29 @@ export default function VoiceAgent() {
     },
     onError: (error) => {
       console.error("Conversation error:", error);
+      const errorMessage = typeof error === "string" ? error : (error && typeof error === 'object' && 'message' in error) ? String(error.message) : "Unknown connection error";
       toast({
         title: "Connection Error",
-        description: typeof error === "string" ? error : "Failed to connect to voice agent",
+        description: errorMessage,
         variant: "destructive",
       });
+      
+      // Auto-disconnect on error to prevent hanging state
+      if (conversation.status === "connected") {
+        handleEndSession();
+      }
+    },
+    onStatusChange: (status) => {
+      console.log("Conversation status changed:", status);
+      if (currentConversationId) {
+        updateStatusMutation.mutate({
+          id: currentConversationId,
+          status: String(status),
+        });
+      }
+    },
+    onDebug: (debugInfo) => {
+      console.log("Conversation debug:", debugInfo);
     },
     onAudio: (audio) => {
       // Handle audio data for visualization
@@ -146,16 +174,26 @@ export default function VoiceAgent() {
       if (connectionType === "webrtc") {
         const response = await fetch(`/api/conversation/token?agent_id=${agentId}`);
         if (!response.ok) {
-          throw new Error("Failed to get conversation token");
+          const errorData = await response.text();
+          console.error("Token request failed:", response.status, errorData);
+          throw new Error(`Failed to get conversation token: ${response.status} - ${errorData}`);
         }
         const data = await response.json();
+        if (!data.token) {
+          throw new Error("No token received from ElevenLabs API");
+        }
         return { conversationToken: data.token };
       } else {
         const response = await fetch(`/api/conversation/signed-url?agent_id=${agentId}`);
         if (!response.ok) {
-          throw new Error("Failed to get signed URL");
+          const errorData = await response.text();
+          console.error("Signed URL request failed:", response.status, errorData);
+          throw new Error(`Failed to get signed URL: ${response.status} - ${errorData}`);
         }
         const data = await response.json();
+        if (!data.signedUrl) {
+          throw new Error("No signed URL received from ElevenLabs API");
+        }
         return { signedUrl: data.signedUrl };
       }
     } catch (error) {
