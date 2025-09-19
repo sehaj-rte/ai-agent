@@ -428,7 +428,7 @@ export default function VoiceAgent() {
                 </div>
               )}
               
-              {conversation.status === "connected" && isAgentSpeaking && (
+              {isAgentSpeaking && (
                 <div className="absolute inset-0 pointer-events-none">
                   {/* Pulsing glow when agent speaks */}
                   <div className="absolute inset-0 rounded-full border-4 border-green-400 animate-ping"></div>
