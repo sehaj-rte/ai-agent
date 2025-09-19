@@ -8,6 +8,7 @@ import { Message } from "@shared/schema";
 import ConversationArea from "@/components/voice-agent/conversation-area";
 import ControlsPanel from "@/components/voice-agent/controls-panel";
 import FeedbackSection from "@/components/voice-agent/feedback-section";
+import AgentSetup from "@/components/voice-agent/agent-setup";
 
 export default function VoiceAgent() {
   const { toast } = useToast();
@@ -343,23 +344,12 @@ export default function VoiceAgent() {
       <main className="flex-1 flex flex-col">
         <div className="max-w-4xl mx-auto w-full px-4 py-8 flex-1">
           
-          {/* Agent Setup Notice */}
-          {!agentId && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-start space-x-3">
-                <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
-                <div>
-                  <h3 className="font-medium text-blue-900 mb-1">Agent Configuration Required</h3>
-                  <p className="text-sm text-blue-800 mb-2">
-                    To use this interface, you'll need to configure your ElevenLabs Agent ID and API authentication on the server side.
-                  </p>
-                  <div className="text-xs text-blue-700 bg-blue-100 p-2 rounded border">
-                    <strong>Required:</strong> Agent ID, API Key (server-side), and optional signed URL or conversation token for private agents.
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Agent Setup */}
+          <AgentSetup 
+            agentId={agentId}
+            onAgentIdChange={setAgentId}
+            isConnected={conversation.status === "connected"}
+          />
 
           {/* Conversation Area */}
           <ConversationArea
