@@ -149,10 +149,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Text-only chat endpoint
+  app.post("/api/chat", async (req, res) => {
+    try {
+      const { message, agentId } = req.body;
+      
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ 
+          message: "Message is required",
+          details: "A valid message string is required"
+        });
+      }
+
+      // Generate contextually appropriate responses based on the message
+      let response = "";
+      const lowerMessage = message.toLowerCase().trim();
+      
+      // Basic pattern matching for more relevant responses
+      if (lowerMessage.includes("hi") || lowerMessage.includes("hello") || lowerMessage.includes("hey")) {
+        response = "Hello! I'm Dr. Elisa Song. It's nice to meet you. How can I help you today?";
+      } else if (lowerMessage.includes("how are you") || lowerMessage.includes("how do you do")) {
+        response = "I'm doing well, thank you for asking! I'm here and ready to help you with any health or wellness questions you might have.";
+      } else if (lowerMessage.includes("help") || lowerMessage.includes("assist")) {
+        response = "I'm here to help! As an integrative pediatrician, I can assist you with questions about children's health, wellness, and integrative medicine approaches.";
+      } else if (lowerMessage.includes("thank")) {
+        response = "You're very welcome! I'm glad I could help. Is there anything else you'd like to discuss?";
+      } else if (lowerMessage.includes("bye") || lowerMessage.includes("goodbye")) {
+        response = "Goodbye! Take care, and don't hesitate to reach out if you have any more questions about health and wellness.";
+      } else if (lowerMessage.includes("health") || lowerMessage.includes("medical")) {
+        response = "I'd be happy to discuss health-related topics with you. As an integrative pediatrician, I focus on combining conventional medicine with holistic approaches. What specific area would you like to explore?";
+      } else if (lowerMessage.includes("child") || lowerMessage.includes("kid") || lowerMessage.includes("baby")) {
+        response = "Children's health is my specialty! I'm passionate about helping kids thrive through integrative approaches. What questions do you have about your child's health or development?";
+      } else if (lowerMessage.length < 10) {
+        // Short messages get encouraging responses
+        response = "I'd love to help you with that. Could you tell me a bit more about what you're looking for?";
+      } else {
+        // Default response for other messages
+        response = "That's an interesting point. As an integrative pediatrician, I believe in addressing health from multiple angles. Could you share more details so I can provide you with the most helpful guidance?";
+      }
+      
+      res.json({ 
+        response: response,
+        agentId: agentId 
+      });
+    } catch (error) {
+      console.error("Error in chat endpoint:", error);
+      res.status(500).json({ 
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // Create a new message
   app.post("/api/messages", async (req, res) => {
     try {
       const validatedData = insertMessageSchema.parse(req.body);
+      
+      // Ensure conversationId is provided and is a string
+      if (!validatedData.conversationId || typeof validatedData.conversationId !== 'string') {
+        return res.status(400).json({ 
+          message: "Invalid conversation ID",
+          details: "A valid conversation ID is required"
+        });
+      }
+      
+      // Check if conversation exists
+      const conversation = await storage.getConversation(validatedData.conversationId);
+      if (!conversation) {
+        return res.status(404).json({ 
+          message: "Conversation not found",
+          details: `No conversation found with id: ${validatedData.conversationId}`
+        });
+      }
+      
       const message = await storage.createMessage(validatedData);
       res.json(message);
     } catch (error) {
@@ -160,7 +230,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
       console.error("Error creating message:", error);
-      res.status(500).json({ message: "Internal server error" });
+      res.status(500).json({ 
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 

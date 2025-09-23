@@ -1,0 +1,6 @@
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Force HTTPS for all requests
+Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"

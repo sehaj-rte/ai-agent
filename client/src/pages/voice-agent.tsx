@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useConversation } from "@elevenlabs/react";
-import { Phone, PhoneOff, Mic, MicOff, User, Clock, Settings, ChevronDown } from "lucide-react";
+import { useLocation } from "wouter";
+import { Phone, PhoneOff, Mic, MicOff, User, Clock, Settings, ChevronDown, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Message } from "@shared/schema";
@@ -16,6 +17,7 @@ import { formatDistanceToNow } from "date-fns";
 export default function VoiceAgent() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   
   // Configuration state
   // Get agent ID from environment variable
@@ -31,6 +33,11 @@ export default function VoiceAgent() {
   const [callStartTime, setCallStartTime] = useState<Date | null>(null);
   const [callDuration, setCallDuration] = useState<string>("00:00");
   const [showSettings, setShowSettings] = useState(false);
+
+  // Navigate to chat page
+  const goToChat = useCallback(() => {
+    setLocation('/chat');
+  }, [setLocation]);
 
   // Update call duration timer
   useEffect(() => {
@@ -298,6 +305,8 @@ export default function VoiceAgent() {
     setMicMuted(prev => !prev);
   }, []);
 
+
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "connected":
@@ -423,7 +432,7 @@ export default function VoiceAgent() {
                   alt="Dr. Elisa Song"
                 />
                 <AvatarFallback className="text-2xl">
-                  <User className="w-12 h-12" />
+                  <Phone className="w-12 h-12" />
                 </AvatarFallback>
               </Avatar>
               {/* Professional phone call animations */}
@@ -457,15 +466,33 @@ export default function VoiceAgent() {
           {/* Call Controls */}
           <div className="flex items-center justify-center space-x-8 mb-8">
             {conversation.status === "disconnected" ? (
-              <Button
-                onClick={handleStartSession}
-                className="w-16 h-16 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg"
-                data-testid="button-start-call"
-              >
-                <Phone className="w-8 h-8" />
-              </Button>
+              <>
+                <Button
+                  onClick={goToChat}
+                  variant="outline"
+                  className="w-16 h-16 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg"
+                  data-testid="button-open-chat"
+                >
+                  <MessageCircle className="w-8 h-8" />
+                </Button>
+                <Button
+                  onClick={handleStartSession}
+                  className="w-16 h-16 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg"
+                  data-testid="button-start-call"
+                >
+                  <Phone className="w-8 h-8" />
+                </Button>
+              </>
             ) : (
               <>
+                <Button
+                  onClick={goToChat}
+                  variant="outline"
+                  className="w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-600 text-white"
+                  data-testid="button-toggle-chat"
+                >
+                  <MessageCircle className="w-6 h-6" />
+                </Button>
                 <Button
                   onClick={toggleMute}
                   variant={micMuted ? "destructive" : "outline"}
@@ -485,6 +512,7 @@ export default function VoiceAgent() {
               </>
             )}
           </div>
+
 
           {/* Status Messages */}
           {conversation.status === "connected" && (
