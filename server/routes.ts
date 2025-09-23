@@ -40,7 +40,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ signedUrl: body.signed_url });
     } catch (error) {
       console.error("Error getting signed URL:", error);
-      res.status(500).json({ message: "Internal server error" });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Error details:", errorMessage, error instanceof Error ? error.stack : undefined);
+      res.status(500).json({ message: "Internal server error", error: errorMessage });
     }
   });
 
@@ -78,7 +80,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ token: body.token });
     } catch (error) {
       console.error("Error getting conversation token:", error);
-      res.status(500).json({ message: "Internal server error" });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Error details:", errorMessage, error instanceof Error ? error.stack : undefined);
+      res.status(500).json({ message: "Internal server error", error: errorMessage });
     }
   });
 
