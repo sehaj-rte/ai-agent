@@ -59,6 +59,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!apiKey) {
         return res.status(500).json({ message: "ElevenLabs API key not configured" });
       }
+      
+      console.log(`Using agent ID: ${agentId}`);
+      console.log(`Using API key: ${apiKey.substring(0, 10)}...`);
 
       const response = await fetch(
         `https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${agentId}`,
@@ -71,12 +74,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`ElevenLabs API error: Status ${response.status}, Response: ${errorText}`);
         return res.status(response.status).json({ 
           message: `Failed to get conversation token: ${errorText}` 
         });
       }
 
-      const body = await response.json();
+      const responseText = await response.text();
+      console.log(`ElevenLabs API response: ${responseText}`);
+      const body = JSON.parse(responseText);
       res.json({ token: body.token });
     } catch (error) {
       console.error("Error getting conversation token:", error);
