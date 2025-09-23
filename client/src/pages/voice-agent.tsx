@@ -229,7 +229,8 @@ export default function VoiceAgent() {
       }
 
       if (connectionType === "webrtc") {
-        const response = await fetch(`/api/conversation/token?agent_id=${agentId}`);
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+        const response = await fetch(`${baseUrl}/api/conversation/token?agent_id=${agentId}`);
         if (!response.ok) {
           const errorData = await response.text();
           console.error("Token request failed:", response.status, errorData);
@@ -241,7 +242,8 @@ export default function VoiceAgent() {
         }
         return { conversationToken: data.token };
       } else {
-        const response = await fetch(`/api/conversation/signed-url?agent_id=${agentId}`);
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+        const response = await fetch(`${baseUrl}/api/conversation/signed-url?agent_id=${agentId}`);
         if (!response.ok) {
           const errorData = await response.text();
           console.error("Signed URL request failed:", response.status, errorData);
