@@ -9,13 +9,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get signed URL for WebSocket connection (requires agent ID)
   app.get("/api/conversation/signed-url", async (req, res) => {
     try {
-      const agentId = req.query.agent_id as string;
+      const agentId = (req.query.agent_id as string) || "agent_8001k5ef2qn3fbs92mkp16p0sd88";
       
       if (!agentId) {
         return res.status(400).json({ message: "Agent ID is required" });
       }
 
-      const apiKey = process.env.ELEVENLABS_API_KEY;
+      const apiKey = process.env.ELEVENLABS_API_KEY || "sk_475c1be5cf54482b86bf69642792b7e5c4048ffdf8ba2ee4";
       if (!apiKey) {
         return res.status(500).json({ message: "ElevenLabs API key not configured" });
       }
@@ -47,13 +47,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get conversation token for WebRTC connection (requires agent ID)
   app.get("/api/conversation/token", async (req, res) => {
     try {
-      const agentId = req.query.agent_id as string;
+      const agentId = (req.query.agent_id as string) || "agent_8001k5ef2qn3fbs92mkp16p0sd88";
       
       if (!agentId) {
         return res.status(400).json({ message: "Agent ID is required" });
       }
 
-      const apiKey = process.env.ELEVENLABS_API_KEY;
+      const apiKey = process.env.ELEVENLABS_API_KEY || "sk_475c1be5cf54482b86bf69642792b7e5c4048ffdf8ba2ee4";
       if (!apiKey) {
         return res.status(500).json({ message: "ElevenLabs API key not configured" });
       }
