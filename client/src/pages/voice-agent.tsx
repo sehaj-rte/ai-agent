@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useConversation } from "@elevenlabs/react";
 import { useLocation } from "wouter";
-import { Phone, PhoneOff, Mic, MicOff, User, Clock, Settings, ChevronDown, MessageCircle } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, User, Clock, Settings, ChevronDown, MessageCircle, ScreenShare, ScreenShareOff } from "lucide-react";
+import { createWorker } from "tesseract.js";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Message } from "@shared/schema";
@@ -33,24 +34,76 @@ export default function VoiceAgent() {
   const [callStartTime, setCallStartTime] = useState<Date | null>(null);
   const [callDuration, setCallDuration] = useState<string>("00:00");
   const [showSettings, setShowSettings] = useState(false);
+  // Screen sharing state
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenCaptureStream, setScreenCaptureStream] = useState<MediaStream | null>(null);
+  const [ocrWorker, setOcrWorker] = useState<any>(null);
+  const [isAnalyzingScreen, setIsAnalyzingScreen] = useState(false);
+
+  // Use refs to avoid closure issues in client tools
+  const screenSharingRef = useRef(false);
+  const screenCaptureStreamRef = useRef<MediaStream | null>(null);
+  const ocrWorkerRef = useRef<any>(null);
+
+  // Update refs when state changes
+  useEffect(() => {
+    screenSharingRef.current = isScreenSharing;
+  }, [isScreenSharing]);
+
+  useEffect(() => {
+    screenCaptureStreamRef.current = screenCaptureStream;
+  }, [screenCaptureStream]);
+
+  useEffect(() => {
+    ocrWorkerRef.current = ocrWorker;
+  }, [ocrWorker]);
 
   // Navigate to chat page
   const goToChat = useCallback(() => {
     setLocation('/chat');
   }, [setLocation]);
 
+  // Initialize OCR worker
+  useEffect(() => {
+    let workerInstance: any;
+    
+    const initOcrWorker = async () => {
+      try {
+        const worker = await createWorker('eng');
+        setOcrWorker(worker);
+        ocrWorkerRef.current = worker;
+        workerInstance = worker;
+      } catch (error) {
+        console.error('Failed to initialize OCR worker:', error);
+      }
+    };
+
+    initOcrWorker();
+
+    // Cleanup function
+    return () => {
+      if (workerInstance) {
+        workerInstance.terminate();
+      }
+    };
+  }, []);
+
   // Update call duration timer
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (callStartTime) {
       interval = setInterval(() => {
-        const duration = Date.now() - callStartTime.getTime();
-        const minutes = Math.floor(duration / 60000);
-        const seconds = Math.floor((duration % 60000) / 1000);
+        const now = new Date();
+        const diff = now.getTime() - callStartTime.getTime();
+        const minutes = Math.floor(diff / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
         setCallDuration(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
       }, 1000);
     }
-    return () => clearInterval(interval);
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [callStartTime]);
 
 
@@ -58,6 +111,91 @@ export default function VoiceAgent() {
   const conversation = useConversation({
     volume: volume / 100,
     micMuted,
+    clientTools: {
+      // Screen analysis client tool
+      analyzeScreenContent: async () => {
+        console.log('🔍 Screen analysis tool called by agent');
+        console.log('📊 Current state - isScreenSharing:', screenSharingRef.current);
+        console.log('📺 screenCaptureStream exists:', !!screenCaptureStreamRef.current);
+        console.log('🤖 ocrWorker exists:', !!ocrWorkerRef.current);
+        
+        setIsAnalyzingScreen(true);
+        try {
+          // Check if screen capture stream exists
+          if (!screenCaptureStreamRef.current) {
+            console.log('❌ No screen capture stream available');
+            setIsAnalyzingScreen(false);
+            return 'No active screen sharing session found. Please start screen sharing first.';
+          }
+          
+          // Check if OCR worker is ready
+          if (!ocrWorkerRef.current) {
+            console.log('❌ OCR worker not ready');
+            setIsAnalyzingScreen(false);
+            return 'OCR system is still initializing. Please try again in a moment.';
+          }
+          
+          console.log('✅ Starting screen capture and OCR processing');
+          // Create a video element to capture current frame
+          const video = document.createElement('video');
+          video.srcObject = screenCaptureStreamRef.current;
+          video.play();
+          
+          // Wait for video to be ready
+          await new Promise(resolve => {
+            video.addEventListener('playing', resolve);
+          });
+          
+          // Create canvas to capture frame
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          
+          if (ctx) {
+            // Draw current video frame to canvas
+            ctx.drawImage(video, 0, 0);
+            
+            // Convert canvas to blob for OCR
+            const blob = await new Promise<Blob>((resolve, reject) => {
+              canvas.toBlob(blob => {
+                if (blob) resolve(blob);
+                else reject(new Error('Failed to create blob from canvas'));
+              }, 'image/png');
+            });
+            
+            // Run OCR on the captured frame
+            console.log('Running OCR on captured frame');
+            const { data: { text } } = await ocrWorkerRef.current.recognize(blob);
+            console.log('OCR completed, extracted text:', text.substring(0, 100) + '...');
+            
+            // Clean up temporary elements
+            video.remove();
+            canvas.remove();
+            
+            // If we found text, return it
+            if (text.trim()) {
+              const result = `I can see the following text on your screen: ${text.substring(0, 500)}${text.length > 500 ? '...' : ''}`;
+              console.log('Returning OCR result to agent:', result);
+              setIsAnalyzingScreen(false);
+              return result;
+            } else {
+              console.log('No text found in OCR analysis');
+              setIsAnalyzingScreen(false);
+              return 'I analyzed your screen but did not find any readable text content.';
+            }
+          } else {
+            console.log('Failed to get canvas context');
+            setIsAnalyzingScreen(false);
+            return 'Failed to get canvas context for screen capture';
+          }
+        } catch (error) {
+          console.error('Error analyzing screen:', error);
+          setIsAnalyzingScreen(false);
+          return `Failed to analyze screen: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        }
+      }
+    },
     onConnect: () => {
       console.log("Conversation connected successfully");
       setCallStartTime(new Date());
@@ -502,6 +640,74 @@ export default function VoiceAgent() {
                   {micMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
                 </Button>
                 
+                {/* Screen Sharing Button */}
+                <Button
+                  onClick={async () => {
+                    console.log('🖱️ Screen share button clicked, current state:', { isScreenSharing: screenSharingRef.current, hasStream: !!screenCaptureStreamRef.current });
+                    
+                    if (screenSharingRef.current) {
+                      // Stop screen sharing
+                      console.log('🛑 Stopping screen sharing');
+                      if (screenCaptureStreamRef.current) {
+                        screenCaptureStreamRef.current.getTracks().forEach(track => track.stop());
+                        setScreenCaptureStream(null);
+                        setIsScreenSharing(false);
+                        conversation.sendContextualUpdate('User has stopped screen sharing');
+                        console.log('✅ Screen sharing stopped');
+                      }
+                    } else {
+                      // Start screen sharing
+                      console.log('🚀 Starting screen sharing...');
+                      try {
+                        const stream = await navigator.mediaDevices.getDisplayMedia({
+                          video: true,
+                          audio: false
+                        });
+                        
+                        console.log('📺 Got display media stream:', stream);
+                        console.log('📺 Stream tracks:', stream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled })));
+                        
+                        setScreenCaptureStream(stream);
+                        setIsScreenSharing(true);
+                        
+                        console.log('✅ State updated - isScreenSharing: true, stream set');
+                        
+                        // Notify agent about screen sharing
+                        conversation.sendContextualUpdate('User has started screen sharing');
+                        
+                        // Add event listener for when user stops sharing
+                        stream.getVideoTracks()[0].addEventListener('ended', () => {
+                          console.log('📺 Screen sharing stopped by user (stream ended)');
+                          setIsScreenSharing(false);
+                          setScreenCaptureStream(null);
+                          conversation.sendContextualUpdate('User has stopped screen sharing');
+                        });
+                        
+                        console.log('🎉 Screen sharing setup complete');
+                      } catch (error) {
+                        console.error('❌ Error starting screen share:', error);
+                        toast({
+                          title: "Screen Sharing Error",
+                          description: error instanceof Error ? error.message : "Failed to start screen sharing",
+                          variant: "destructive",
+                        });
+                      }
+                    }
+                  }}
+                  variant={isScreenSharing ? "destructive" : "outline"}
+                  className="w-12 h-12 rounded-full relative"
+                  data-testid="button-toggle-screen-share"
+                >
+                  {isScreenSharing ? (
+                    <>
+                      <div className="w-3 h-3 bg-red-500 rounded-full absolute top-1 right-1 animate-pulse"></div>
+                      <ScreenShareOff className="w-6 h-6" />
+                    </>
+                  ) : (
+                    <ScreenShare className="w-6 h-6" />
+                  )}
+                </Button>
+                
                 <Button
                   onClick={handleEndSession}
                   className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-lg"
@@ -518,7 +724,7 @@ export default function VoiceAgent() {
           {conversation.status === "connected" && (
             <div className="text-center py-4">
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                Listening...
+                {isAnalyzingScreen ? 'Analyzing screen content...' : 'Listening...'}
               </p>
             </div>
           )}

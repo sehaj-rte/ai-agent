@@ -165,7 +165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let response = "";
       const lowerMessage = message.toLowerCase().trim();
       
-      // Basic pattern matching for more relevant responses
+      // Enhanced pattern matching for more relevant responses
       if (lowerMessage.includes("hi") || lowerMessage.includes("hello") || lowerMessage.includes("hey")) {
         response = "Hello! I'm Dr. Elisa Song. It's nice to meet you. How can I help you today?";
       } else if (lowerMessage.includes("how are you") || lowerMessage.includes("how do you do")) {
@@ -176,6 +176,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         response = "You're very welcome! I'm glad I could help. Is there anything else you'd like to discuss?";
       } else if (lowerMessage.includes("bye") || lowerMessage.includes("goodbye")) {
         response = "Goodbye! Take care, and don't hesitate to reach out if you have any more questions about health and wellness.";
+      } else if (lowerMessage.includes("fever") || lowerMessage.includes("temperature")) {
+        response = "Fever in children can be concerning. For infants under 3 months, any fever warrants immediate medical attention. For older children, focus on comfort and hydration. When did the fever start, and what's the child's age?";
+      } else if (lowerMessage.includes("cough") || lowerMessage.includes("cold")) {
+        response = "Coughs and colds are common in children. I recommend plenty of rest, fluids, and honey for children over 1 year. How long has this been going on, and are there any other symptoms?";
+      } else if (lowerMessage.includes("nutrition") || lowerMessage.includes("eating") || lowerMessage.includes("food")) {
+        response = "Nutrition is fundamental to children's health! I believe in whole foods and reducing processed options. What specific nutritional concerns do you have for your child?";
+      } else if (lowerMessage.includes("sleep") || lowerMessage.includes("bedtime")) {
+        response = "Sleep is crucial for children's development. I recommend consistent bedtime routines and limiting screen time before bed. What sleep challenges are you experiencing?";
       } else if (lowerMessage.includes("health") || lowerMessage.includes("medical")) {
         response = "I'd be happy to discuss health-related topics with you. As an integrative pediatrician, I focus on combining conventional medicine with holistic approaches. What specific area would you like to explore?";
       } else if (lowerMessage.includes("child") || lowerMessage.includes("kid") || lowerMessage.includes("baby")) {

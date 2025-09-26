@@ -53,11 +53,16 @@ export default function ChatWindow() {
   useEffect(() => {
     const connectToAgent = async () => {
       try {
-        // For simplicity, using public agent connection
-        // In production, you'd want to get auth from your server
+        // Get WebSocket signed URL from your server
+        const response = await fetch(`/api/conversation/signed-url?agent_id=${agentId}`);
+        if (!response.ok) {
+          throw new Error('Failed to get signed URL');
+        }
+        const { signedUrl } = await response.json();
+        
+        // Connect using WebSocket with signed URL
         await conversation.startSession({
-          agentId: agentId,
-          connectionType: 'webrtc',
+          signedUrl: signedUrl,
         });
       } catch (error) {
         console.error("Failed to connect to agent:", error);
